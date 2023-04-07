@@ -65,7 +65,7 @@ cloudClient <- function(service, authInfo) {
     },
 
     getApplication = function(applicationId) {
-      if (startsWith(applicationId, "lucid:content:")) {
+      if (is.character(applicationId) && startsWith(applicationId, "lucid:content:")) {
         # applicationId refers in this case to the id of the output, not the
         # application.
         contentId <- strsplit(applicationId, ":")[[1]][3]
