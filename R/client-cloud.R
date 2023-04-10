@@ -120,7 +120,6 @@ cloudClient <- function(service, authInfo) {
 
       currentApplicationId <- Sys.getenv("LUCID_APPLICATION_ID")
       if (currentApplicationId != "") {
-        print("Found application...")
         path <- paste("/applications/", currentApplicationId, sep = "")
         current_application <- GET(service, authInfo, path)
         project_id <- current_application$content_id
