@@ -27,6 +27,32 @@ mockServerFactory <- function(responses) {
       contentType = "application/json"
     )
 
+    # Stock responses for certain endpoints. Can still be overridden by tests.
+    if (is.null(responses$"^GET /v1/users/current")) {
+      responses$"GET /v1/users/current" = list(
+        content = list(
+          id=100
+        )
+      )
+    }
+
+    if (is.null(responses$"^GET /v1/accounts/?")) {
+      responses$"^GET /v1/accounts/?" = list(
+        content = list(
+          count=1,
+          total=1,
+          offset=0,
+          accounts=list(
+            list(
+              id=50,
+              name="testthat-account",
+              account="testthat-account"
+            )
+          )
+        )
+      )
+    }
+
     found <- FALSE
 
     for (pathRegex in names(responses)) {
@@ -64,6 +90,29 @@ mockServerFactory <- function(responses) {
   }
 
   mockServer
+}
+
+configureTestAccount <- function(server = 'posit.cloud', name = NULL) {
+  if (is.null(name)) {
+    name = 'testthat-account'
+  }
+
+  existingAccount <- NULL
+  tryCatch(
+    existingAccount <- accountInfo(name, server),
+    error = function(e) { existingAccount = NULL }
+  )
+
+  if (is.null(existingAccount)) {
+    setAccountInfo(
+      name = name,
+      token = 'foo',
+      secret = 'bar',
+      server = server
+    )
+  }
+
+  name
 }
 
 test_that("Get application", {
@@ -206,4 +255,63 @@ test_that("Create application with linked source project", {
   expect_equal(app$id, 2)
   expect_equal(app$content_id, 1)
   expect_equal(app$url, "http://fake-url.test.me/")
+})
+
+test_that("deploymentTargetForApp() results in correct Cloud API calls", {
+  mockServer = mockServerFactory(list(
+    "^GET /v1/applications/([0-9]+)" = list(
+      content = function(methodAndPath, match, ...) {
+        end <- attr(match, 'match.length')[2] + match[2]
+        application_id <- strtoi(substr(methodAndPath, match[2], end))
+        list(
+          "id"=application_id,
+          "content_id"=application_id-1,
+          "name"=paste("testthat app", application_id)
+        )
+      }
+    ),
+    "^GET /v1/outputs/([0-9]+)" = list(
+      content = function(methodAndPath, match, ...) {
+        end <- attr(match, 'match.length')[2] + match[2]
+        output_id <- strtoi(substr(methodAndPath, match[2], end))
+
+        list(
+          "id"=output_id,
+          "source_id"=output_id + 1,
+          "url"="http://fake-url.test.me/"
+        )
+      }
+    )
+  ))
+
+  restoreOpt <- options(rsconnect.http = mockServer)
+  withr::defer(options(restoreOpt))
+
+  testAccount <- configureTestAccount()
+  withr::defer(removeAccount(testAccount))
+
+  target <- deploymentTargetForApp(
+    appId = 3,
+    account = testAccount,
+    server = 'posit.cloud',
+  )
+
+  expect_equal(target$appName, "testthat app 3")
+  expect_equal(target$account, testAccount)
+  expect_equal(target$server, 'posit.cloud')
+  expect_equal(target$appId, 3)
+})
+
+test_that("deployApp() results in correct Cloud API calls", {
+  mockServer = mockServerFactory(list())
+
+  restoreOpt <- options(rsconnect.http = mockServer)
+  withr::defer(options(restoreOpt))
+
+  deployApp(
+    appDir = test_path('shinyapp-simple'),
+    server = 'posit.cloud'
+  )
+
+  # TODO: add another posit.cloud account and test again with that environment
 })
