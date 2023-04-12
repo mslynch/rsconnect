@@ -47,6 +47,11 @@ mockServerFactory <- function(responses) {
               id=50,
               name="testthat-account",
               account="testthat-account"
+            ),
+            list(
+              id=51,
+              name="testthat-superfluous-account",
+              account="testthat-superfluous-account"
             )
           )
         )
@@ -302,16 +307,271 @@ test_that("deploymentTargetForApp() results in correct Cloud API calls", {
   expect_equal(target$appId, 3)
 })
 
-test_that("deployApp() results in correct Cloud API calls", {
-  mockServer = mockServerFactory(list())
+deployAppMockServerFactory <- function(expectedAppType) {
+  outputResponse <- list(
+    "id"=1,
+    "source_id"=2,
+    "url"="http://fake-url.test.me/"
+  )
+
+  actualCalls = list(
+    outputCreated = FALSE,
+    revisionCreated = FALSE,
+    bundleCreated = FALSE,
+    bundleUploaded = FALSE,
+    bundleReady = FALSE,
+    deployStarted = FALSE
+  )
+
+  server <- mockServerFactory(list(
+    # An attempt to search for preexisting applications with the same name.
+    # This call should change, see https://github.com/rstudio/rsconnect/issues/808
+    "^GET /v1/applications/[?]filter=account_id:50&filter=type:connect"=list(
+      content=list(
+        count=0,
+        total=0,
+        applications=list()
+      )
+    ),
+    "^POST /v1/outputs$"=list(
+      content=function(methodAndPath, match, contentFile, ...) {
+        e <- environment(); p <- parent.env(e); p$actualCalls$outputCreated <- TRUE
+
+        content = jsonlite::fromJSON(readChar(contentFile, file.info(contentFile)$size))
+
+        expect_equal(content$application_type, expectedAppType)
+        expect_equal(content$name, "Desired name here")
+
+        outputResponse
+      }
+    ),
+    "^GET /v1/applications/([0-9]+)$" = list(
+      content = function(methodAndPath, match, ...) {
+        end <- attr(match, 'match.length')[2] + match[2]
+        application_id <- strtoi(substr(methodAndPath, match[2], end))
+
+        list(
+          id=application_id,
+          content_id=application_id-1,
+          name=paste("testthat app", application_id),
+          type=expectedAppType
+        )
+      }
+    ),
+    "^POST /v1/bundles/123/status$" = list(
+      content = function(methodAndPath, match, contentFile, ...){
+        e <- environment(); p <- parent.env(e); p$actualCalls$bundleReady = TRUE
+
+        content = jsonlite::fromJSON(readChar(contentFile, file.info(contentFile)$size))
+        expect_equal(content$status, "ready")
+
+        list()
+      }
+    ),
+    "^POST /v1/bundles$" = list(
+      content = function(methodAndPath, match, contentFile, ...) {
+        e <- environment(); p <- parent.env(e); p$actualCalls$bundleCreated = TRUE
+
+        content = jsonlite::fromJSON(readChar(contentFile, file.info(contentFile)$size))
+
+        list(
+          id=123,
+          presigned_url="https://write-only-memory.com/fake-presigned-url",
+          presigned_checksum=content$checksum
+        )
+      }
+    ),
+    "^PUT /fake-presigned-url" = list(
+      content = function(...) {
+        e <- environment(); p <- parent.env(e); p$actualCalls$bundleUploaded = TRUE
+      }
+    ),
+    "^GET /v1/bundles/123$" = list(
+      content=list(
+        id=123,
+        status="ready"
+      )
+    ),
+    "^POST /v1/applications/[23]/deploy$" = list(
+      content=function(...) {
+        e <- environment(); p <- parent.env(e); p$actualCalls$deployStarted = TRUE
+        list(
+          task_id="testthat-task-id"
+        )
+      }
+    ),
+    "^GET /v1/tasks/testthat-task-id$" = list(
+      content = list(
+        status="success",
+        finished=TRUE
+      )
+    ),
+    # Fetch existing output when re-deploying from .dcf data
+    "^GET /v1/outputs/1$" = list(
+      content=outputResponse
+    ),
+    "^POST /v1/outputs/1/revisions" = list(
+      content=function(...) {
+        e <- environment(); p <- parent.env(e); p$actualCalls$revisionCreated = TRUE
+
+        list(
+          application_id=3
+        )
+      }
+    )
+  ))
+
+  expect_calls <- function(expectedCalls) {
+    expect_equal(expectedCalls, actualCalls)
+  }
+
+  reset_calls <- function() {
+    e <- environment(); p <- parent.env(e); p$actualCalls = list(
+      outputCreated = FALSE,
+      revisionCreated = FALSE,
+      bundleCreated = FALSE,
+      bundleUploaded = FALSE,
+      bundleReady = FALSE,
+      deployStarted = FALSE
+    )
+  }
+
+  list(
+    server=server,
+    expect_calls=expect_calls,
+    reset_calls=reset_calls
+  )
+}
+
+test_that("deployApp() for shiny results in correct Cloud API calls", {
+  mock <- deployAppMockServerFactory(expectedAppType="connect")
+  mockServer <- mock$server
 
   restoreOpt <- options(rsconnect.http = mockServer)
   withr::defer(options(restoreOpt))
 
+  testAccount <- configureTestAccount()
+  withr::defer(removeAccount(testAccount))
+
+  sourcePath = test_path('shinyapp-simple')
+  # Remove local deployment info at end for reproducibility and tidiness.
+  withr::defer(forgetDeployment(appPath=sourcePath))
+
   deployApp(
-    appDir = test_path('shinyapp-simple'),
-    server = 'posit.cloud'
+    appName = "Desired name here",
+    appDir = sourcePath,
+    server = 'posit.cloud',
+    account = testAccount
   )
 
-  # TODO: add another posit.cloud account and test again with that environment
+  mock$expect_calls(list(
+    outputCreated = TRUE,
+    revisionCreated = FALSE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
+
+  mock$reset_calls()
+
+  # deploy again to test existing deployment path
+  deployApp(
+    appDir = sourcePath
+  )
+
+  mock$expect_calls(list(
+    outputCreated = FALSE,
+    revisionCreated = FALSE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
+
+  # Start over, add another posit.cloud account and test again with that environment
+  mock$reset_calls()
+  forgetDeployment(appPath=sourcePath)
+
+  extraLocalAccount <- configureTestAccount(name="testthat-superfluous-account")
+  withr::defer(removeAccount(extraLocalAccount))
+
+  deployApp(
+    appName = "Desired name here",
+    appDir = sourcePath,
+    server = 'posit.cloud',
+    account = testAccount
+  )
+
+  mock$expect_calls(list(
+    outputCreated = TRUE,
+    revisionCreated = FALSE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
+
+  mock$reset_calls()
+
+  # deploy again to test existing deployment path
+  deployApp(
+    appDir = sourcePath
+  )
+
+  mock$expect_calls(list(
+    outputCreated = FALSE,
+    revisionCreated = FALSE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
+})
+
+test_that("deployDoc() results in correct Cloud API calls", {
+  mock <- deployAppMockServerFactory(expectedAppType="static")
+  mockServer <- mock$server
+
+  restoreOpt <- options(rsconnect.http = mockServer)
+  withr::defer(options(restoreOpt))
+
+  testAccount <- configureTestAccount()
+  withr::defer(removeAccount(testAccount))
+
+  sourcePath = test_path('static-with-quarto-yaml')
+  # Remove local deployment info at end for reproducibility and tidiness.
+  withr::defer(forgetDeployment(appPath=sourcePath))
+
+  deployDoc(
+    paste(sourcePath, "slideshow.html", sep="/"),
+    appName = "Desired name here",
+    server = 'posit.cloud',
+    account = testAccount
+  )
+
+  mock$expect_calls(list(
+    outputCreated = TRUE,
+    revisionCreated = FALSE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
+
+  mock$reset_calls()
+
+  # deploy again to test existing deployment path
+  deployApp(
+    appDir = sourcePath
+  )
+
+  mock$expect_calls(list(
+    outputCreated = FALSE,
+    revisionCreated = TRUE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
 })
