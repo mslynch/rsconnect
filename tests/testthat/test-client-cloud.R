@@ -1,5 +1,44 @@
-mockServerFactory <- function(responses) {
-  mockServer <- function(protocol,
+mockServerFactory <- function(initialResponses) {
+  # Stock responses for certain endpoints. Can still be overridden by tests.
+  if (is.null(initialResponses$"^GET /v1/users/current")) {
+    initialResponses$"GET /v1/users/current" = list(
+      content = list(
+        id=100
+      )
+    )
+  }
+
+  if (is.null(initialResponses$"^GET /v1/accounts/?")) {
+    initialResponses$"^GET /v1/accounts/?" = list(
+      content = list(
+        count=1,
+        total=1,
+        offset=0,
+        accounts=list(
+          list(
+            id=50,
+            name="testthat-account",
+            account="testthat-account"
+          ),
+          list(
+            id=51,
+            name="testthat-superfluous-account",
+            account="testthat-superfluous-account"
+          )
+        )
+      )
+    )
+  }
+
+  mockServer <- list(
+    responses = initialResponses
+  )
+
+  mockServer$addResponse <- function(methodAndPath, response) {
+    mockServer$responses <- append(mockServer$responses, response)
+  }
+
+  mockServer$impl <- function(protocol,
                           host,
                           port,
                           method,
@@ -27,44 +66,13 @@ mockServerFactory <- function(responses) {
       contentType = "application/json"
     )
 
-    # Stock responses for certain endpoints. Can still be overridden by tests.
-    if (is.null(responses$"^GET /v1/users/current")) {
-      responses$"GET /v1/users/current" = list(
-        content = list(
-          id=100
-        )
-      )
-    }
-
-    if (is.null(responses$"^GET /v1/accounts/?")) {
-      responses$"^GET /v1/accounts/?" = list(
-        content = list(
-          count=1,
-          total=1,
-          offset=0,
-          accounts=list(
-            list(
-              id=50,
-              name="testthat-account",
-              account="testthat-account"
-            ),
-            list(
-              id=51,
-              name="testthat-superfluous-account",
-              account="testthat-superfluous-account"
-            )
-          )
-        )
-      )
-    }
-
     found <- FALSE
 
-    for (pathRegex in names(responses)) {
+    for (pathRegex in names(mockServer$responses)) {
       match <- regexec(pathRegex, methodAndPath)[[1]]
       if (match[1] != -1) {
         found <- TRUE
-        responseSupplement <- responses[[pathRegex]]
+        responseSupplement <- mockServer$responses[[pathRegex]]
 
         for (respProperty in names(responseSupplement)) {
           if (is.function(responseSupplement[[respProperty]])) {
@@ -147,7 +155,7 @@ test_that("Get application", {
     )
   ))
 
-  restoreOpt <- options(rsconnect.http = mockServer)
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
   withr::defer(options(restoreOpt))
 
   fakeService <- list(
@@ -191,7 +199,7 @@ test_that("Create application", {
       })
   ))
 
-  restoreOpt <- options(rsconnect.http = mockServer)
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
   withr::defer(options(restoreOpt))
 
   fakeService <- list(
@@ -242,7 +250,7 @@ test_that("Create application with linked source project", {
     )
   ))
 
-  restoreOpt <- options(rsconnect.http = mockServer)
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
   withr::defer(options(restoreOpt))
 
   Sys.setenv(LUCID_APPLICATION_ID="42")
@@ -289,7 +297,7 @@ test_that("deploymentTargetForApp() results in correct Cloud API calls", {
     )
   ))
 
-  restoreOpt <- options(rsconnect.http = mockServer)
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
   withr::defer(options(restoreOpt))
 
   testAccount <- configureTestAccount()
@@ -447,7 +455,7 @@ test_that("deployApp() for shiny results in correct Cloud API calls", {
   mock <- deployAppMockServerFactory(expectedAppType="connect")
   mockServer <- mock$server
 
-  restoreOpt <- options(rsconnect.http = mockServer)
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
   withr::defer(options(restoreOpt))
 
   testAccount <- configureTestAccount()
@@ -533,7 +541,7 @@ test_that("deployDoc() results in correct Cloud API calls", {
   mock <- deployAppMockServerFactory(expectedAppType="static")
   mockServer <- mock$server
 
-  restoreOpt <- options(rsconnect.http = mockServer)
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
   withr::defer(options(restoreOpt))
 
   testAccount <- configureTestAccount()
