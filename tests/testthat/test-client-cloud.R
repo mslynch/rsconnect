@@ -583,3 +583,34 @@ test_that("deployDoc() results in correct Cloud API calls", {
     deployStarted = TRUE
   ))
 })
+
+test_that("deployDoc() to manually specified existing content results in correct Cloud API calls", {
+  mock <- deployAppMockServerFactory(expectedAppType="static")
+  mockServer <- mock$server
+
+  restoreOpt <- options(rsconnect.http = mockServer$impl)
+  withr::defer(options(restoreOpt))
+
+  testAccount <- configureTestAccount()
+  withr::defer(removeAccount(testAccount))
+
+  sourcePath = test_path('static-with-quarto-yaml')
+  # Remove local deployment info at end for reproducibility and tidiness.
+  withr::defer(forgetDeployment(appPath=sourcePath))
+
+  deployDoc(
+    paste(sourcePath, "slideshow.html", sep="/"),
+    appId = "lucid:content:1",
+    server = 'posit.cloud',
+    account = testAccount,
+  )
+
+  mock$expect_calls(list(
+    outputCreated = FALSE,
+    revisionCreated = TRUE,
+    bundleCreated = TRUE,
+    bundleUploaded = TRUE,
+    bundleReady = TRUE,
+    deployStarted = TRUE
+  ))
+})
