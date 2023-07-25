@@ -160,6 +160,7 @@ inferAppMode <- function(absoluteAppFiles,
     if (usesQuarto) {
       return("quarto-shiny")
     } else {
+      print("**** a")
       return("rmd-shiny")
     }
   }
@@ -182,6 +183,7 @@ inferAppMode <- function(absoluteAppFiles,
       # they can be served from a shiny process in Connect until we have better support of
       # rmarkdown static content
       if (coerceStaticRmd) {
+        print("**** b")
         return("rmd-shiny")
       }
       return("rmd-static")
