@@ -120,7 +120,7 @@ checkAppLayout <- function(appDir, appPrimaryDoc = NULL) {
 inferAppMode <- function(absoluteAppFiles,
                          usesQuarto = NA,
                          coerceStaticRmd = FALSE) {
-
+  print("**** in inferAppMode")
   matchingNames <- function(paths, pattern) {
     idx <- grepl(pattern, basename(paths), ignore.case = TRUE, perl = TRUE)
     paths[idx]
@@ -135,6 +135,7 @@ inferAppMode <- function(absoluteAppFiles,
   # Shiny application using single-file app.R style.
   appR <- matchingNames(absoluteAppFiles, "^app.r$")
   if (length(appR) > 0) {
+    print("**** a")
     return("shiny")
   }
 
@@ -160,7 +161,7 @@ inferAppMode <- function(absoluteAppFiles,
     if (usesQuarto) {
       return("quarto-shiny")
     } else {
-      print("**** a")
+      print("**** b")
       return("rmd-shiny")
     }
   }
@@ -170,6 +171,7 @@ inferAppMode <- function(absoluteAppFiles,
   # to be run by rmarkdown::run (rmd-shiny).
   serverR <- matchingNames(absoluteAppFiles, "^server.r$")
   if (length(serverR) > 0) {
+    print("**** c")
     return("shiny")
   }
 
@@ -183,7 +185,7 @@ inferAppMode <- function(absoluteAppFiles,
       # they can be served from a shiny process in Connect until we have better support of
       # rmarkdown static content
       if (coerceStaticRmd) {
-        print("**** b")
+        print("**** d")
         return("rmd-shiny")
       }
       return("rmd-static")
