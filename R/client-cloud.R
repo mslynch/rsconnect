@@ -235,7 +235,8 @@ cloudClient <- function(service, authInfo) {
     },
 
     deployApplication = function(application, bundleId = NULL) {
-      print("**** deployApplication")
+      print("**** deployApplication, bundle:")
+      print(bundleId)
       currentProjectId <- getCurrentProjectId(service, authInfo)
       if (!is.null(currentProjectId)) {
         path <- paste0("/outputs/", application$id)
