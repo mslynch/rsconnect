@@ -164,7 +164,7 @@ cloudClient <- function(service, authInfo) {
     createApplication = function(name, title, template, accountId, appMode) {
       json <- list()
       json$name <- name
-      print("**** appMode:")
+      print("**** createApplication, appMode:")
       print(appMode)
       json$application_type <- if (appMode %in% c("rmd-static", "quarto-static", "static")) "static" else "connect"
       if (appMode %in% c("rmd-static", "quarto-static")) {
@@ -216,6 +216,7 @@ cloudClient <- function(service, authInfo) {
     },
 
     uploadApplication = function(applicationId, bundlePath) {
+      print("**** uploadApplication")
       path <- paste0("/applications/", applicationId, "/upload")
       POST(
         service,
@@ -227,12 +228,14 @@ cloudClient <- function(service, authInfo) {
     },
 
     createRevision = function(application) {
+        print("**** createRevision")
         path <- paste0("/outputs/", application$id, "/revisions")
         revision <- POST_JSON(service, authInfo, path, data.frame())
         revision$application_id
     },
 
     deployApplication = function(application, bundleId = NULL) {
+      print("**** deployApplication")
       currentProjectId <- getCurrentProjectId(service, authInfo)
       if (!is.null(currentProjectId)) {
         path <- paste0("/outputs/", application$id)
