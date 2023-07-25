@@ -129,13 +129,14 @@ inferAppMode <- function(absoluteAppFiles,
   # plumber API
   plumberFiles <- matchingNames(absoluteAppFiles, "^(plumber|entrypoint).r$")
   if (length(plumberFiles) > 0) {
+    print("**** a")
     return("api")
   }
 
   # Shiny application using single-file app.R style.
   appR <- matchingNames(absoluteAppFiles, "^app.r$")
   if (length(appR) > 0) {
-    print("**** a")
+    print("**** b")
     return("shiny")
   }
 
@@ -156,12 +157,14 @@ inferAppMode <- function(absoluteAppFiles,
   hasShinyQmd <- any(sapply(qmdFiles, isShinyRmd))
 
   if (hasShinyQmd) {
+    print("**** c")
     return("quarto-shiny")
   } else if (hasShinyRmd) {
     if (usesQuarto) {
+      print("**** d")
       return("quarto-shiny")
     } else {
-      print("**** b")
+      print("**** e")
       return("rmd-shiny")
     }
   }
@@ -171,7 +174,7 @@ inferAppMode <- function(absoluteAppFiles,
   # to be run by rmarkdown::run (rmd-shiny).
   serverR <- matchingNames(absoluteAppFiles, "^server.r$")
   if (length(serverR) > 0) {
-    print("**** c")
+    print("**** f")
     return("shiny")
   }
 
@@ -179,20 +182,23 @@ inferAppMode <- function(absoluteAppFiles,
   # rmd-static or quarto-static.
   if (length(rmdFiles) > 0 || length(qmdFiles) > 0) {
     if (usesQuarto) {
+      print("**** g")
       return("quarto-static")
     } else {
       # For Shinyapps and posit.cloud, treat "rmd-static" app mode as "rmd-shiny" so that
       # they can be served from a shiny process in Connect until we have better support of
       # rmarkdown static content
       if (coerceStaticRmd) {
-        print("**** d")
+        print("**** h")
         return("rmd-shiny")
       }
+      print("**** i")
       return("rmd-static")
     }
   }
 
   # no renderable content
+  print("**** j")
   "static"
 }
 
