@@ -91,7 +91,6 @@ standardizeRenvPackage <- function(pkg,
     pkg$Source <- "Bioconductor"
   }
 
-  print(pkg)
   if (pkg$Source == "Repository") {
     if (identical(pkg$Repository, "CRAN")) {
       if (isDevVersion(pkg, availablePackages)) {
