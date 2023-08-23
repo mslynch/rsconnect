@@ -122,10 +122,6 @@ createAppManifest <- function(appDir,
       quiet = quiet
     )
 
-    json <- jsonlite::toJSON(packages, pretty = TRUE)
-    fileConn <- file("a.json")
-    writeLines(json, fileConn)
-    close(fileConn)
   } else {
     packages <- list()
   }

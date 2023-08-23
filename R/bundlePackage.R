@@ -26,6 +26,11 @@ bundlePackages <- function(bundleDir,
   })
   names(packages_list) <- deps$Package
 
+  json <- jsonlite::toJSON(packages, pretty = TRUE)
+  fileConn <- file("a.json")
+  writeLines(json, fileConn)
+  close(fileConn)
+
   packages_list
 }
 
