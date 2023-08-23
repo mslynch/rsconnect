@@ -124,7 +124,9 @@ standardizeRenvPackage <- function(pkg,
     pkg <- pkg[!grepl("^Remote", names(pkg))]
   }
 
-  pkg[manifestPackageColumns(pkg)]
+  x <- pkg[manifestPackageColumns(pkg)]
+  print(x)
+  x
 }
 
 biocPackages <- function(bundleDir) {
