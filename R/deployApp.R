@@ -622,7 +622,7 @@ bundleApp <- function(appName,
   manifestPath <- file.path(bundleDir, "manifest.json")
 
   json <- jsonlite::toJSON(manifest, pretty = TRUE)
-  fileConn <- file("a.json")
+  fileConn <- file("b.json")
   writeLines(json, fileConn)
   close(fileConn)
   
