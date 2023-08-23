@@ -124,9 +124,9 @@ package_record <- function(name, lib_dir = NULL) {
   print(record$Encoding)
   encoding <- record$Encoding
 
-  if (toupper(encoding) != "UTF-8") {
+  if (!is.null(encoding) && toupper(encoding) != "UTF-8") {
     record <- lapply(record, function(item) {
-      iconv(item, from = encoding, to = 'UTF-8')
+      iconv(item, from = encoding, to = "UTF-8")
     })
   }
   record
