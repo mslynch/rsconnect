@@ -621,7 +621,12 @@ bundleApp <- function(appName,
   manifestJson <- toJSON(manifest)
   manifestPath <- file.path(bundleDir, "manifest.json")
 
-  json <- jsonlite::toJSON(manifest, pretty = TRUE)
+  json <- jsonlite::toJSON(manifest,     dataframe = "columns",
+    null = "null",
+    na = "null",
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    digits = 30)
   fileConn <- file("b.json")
   writeLines(json, fileConn)
   close(fileConn)
