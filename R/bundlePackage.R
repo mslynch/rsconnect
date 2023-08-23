@@ -120,5 +120,14 @@ availablePackages <- function(repos) {
 
 package_record <- function(name, lib_dir = NULL) {
   path <- system.file("DESCRIPTION", package = name, lib.loc = lib_dir)
-  as.list(as.data.frame(read.dcf(path)))
+  record <- as.list(as.data.frame(read.dcf(path)))
+  print(record$Encoding)
+  encoding <- record$Encoding
+
+  if (toupper(encoding) != "UTF-8") {
+    record <- lapply(record, function(item) {
+      iconv(item, from = encoding, to = 'UTF-8')
+    })
+  }
+  record
 }
