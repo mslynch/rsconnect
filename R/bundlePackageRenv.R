@@ -74,7 +74,9 @@ standardizeRenvPackages <- function(packages, repos, biocPackages = NULL) {
   )
   out <- compact(out)
   out <- lapply(out, as.data.frame, stringsAsFactors = FALSE)
-  rbind_fill(out)
+  x <- rbind_fill(out)
+  print(x)
+  x
 }
 
 standardizeRenvPackage <- function(pkg,
@@ -124,7 +126,7 @@ standardizeRenvPackage <- function(pkg,
   }
 
   x <- pkg[manifestPackageColumns(pkg)]
-  print(x)
+  # print(x)
   x
 }
 
